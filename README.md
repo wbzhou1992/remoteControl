@@ -44,6 +44,7 @@ npm run server
 ```
 
 服务启动后：
+
 - 信令 WebSocket: `ws://localhost:3000/ws`
 - Web 主机页面: `http://localhost:3000/host.html`
 - 健康检查: `http://localhost:3000/health`
@@ -79,6 +80,7 @@ flutter run            # iOS / Android / macOS / Web
 3. 点击「作为控制端」连接
 
 连接成功后即可看到远程桌面画面，支持：
+
 - 单指拖动 → 鼠标移动
 - 点击 → 左键点击
 - 长按/右键 → 右键点击
@@ -86,13 +88,13 @@ flutter run            # iOS / Android / macOS / Web
 
 ## 信令协议
 
-| 消息类型 | 方向 | 说明 |
-|---------|------|------|
-| `create-room` | 主机 → 服务器 | 创建房间 |
-| `join-room` | 控制端 → 服务器 | 加入房间 |
-| `offer` / `answer` | 双向 | WebRTC SDP 交换 |
-| `ice-candidate` | 双向 | ICE 候选交换 |
-| `input-event` | 控制端 → 主机 | 远程输入事件 |
+| 消息类型           | 方向            | 说明            |
+| ------------------ | --------------- | --------------- |
+| `create-room`      | 主机 → 服务器   | 创建房间        |
+| `join-room`        | 控制端 → 服务器 | 加入房间        |
+| `offer` / `answer` | 双向            | WebRTC SDP 交换 |
+| `ice-candidate`    | 双向            | ICE 候选交换    |
+| `input-event`      | 控制端 → 主机   | 远程输入事件    |
 
 ## 输入事件格式
 
@@ -110,18 +112,18 @@ flutter run            # iOS / Android / macOS / Web
 
 ## 配置
 
-| 环境变量 | 默认值 | 说明 |
-|---------|--------|------|
-| `PORT` | `3000` | 信令服务器端口 |
+| 环境变量 | 默认值 | 说明           |
+| -------- | ------ | -------------- |
+| `PORT`   | `3000` | 信令服务器端口 |
 
 ## 平台支持
 
-| 组件 | macOS | Windows | Linux | iOS/Android |
-|------|-------|---------|-------|-------------|
-| 信令服务器 | ✅ | ✅ | ✅ | — |
-| Flutter 控制端 | ✅ | ✅ | ✅ | ✅ |
-| Flutter 主机 | ✅ | ✅ | ✅ | 部分 |
-| 浏览器主机 | ✅ | ✅ | ✅ | — |
+| 组件           | macOS | Windows | Linux | iOS/Android |
+| -------------- | ----- | ------- | ----- | ----------- |
+| 信令服务器     | ✅    | ✅      | ✅    | —           |
+| Flutter 控制端 | ✅    | ✅      | ✅    | ✅          |
+| Flutter 主机   | ✅    | ✅      | ✅    | 部分        |
+| 浏览器主机     | ✅    | ✅      | ✅    | —           |
 
 ## 注意事项
 
@@ -138,3 +140,19 @@ cd server && npm run dev
 # Flutter 分析
 cd flutter_client && flutter analyze
 ```
+
+|                                            主页面                                            |
+| :------------------------------------------------------------------------------------------: |
+| ![](https://raw.githubusercontent.com/wbzhou1992/remoteControl/refs/heads/main/images/5.png) |
+
+|                                           主机模式                                           |
+| :------------------------------------------------------------------------------------------: |
+| ![](https://raw.githubusercontent.com/wbzhou1992/remoteControl/refs/heads/main/images/1.png) |
+
+|                                           共享选择                                           |
+| :------------------------------------------------------------------------------------------: |
+| ![](https://raw.githubusercontent.com/wbzhou1992/remoteControl/refs/heads/main/images/4.png) |
+
+|                                           远程桌面                                           |
+| :------------------------------------------------------------------------------------------: | :------------------------------------------------------------------------------------------: |
+| ![](https://raw.githubusercontent.com/wbzhou1992/remoteControl/refs/heads/main/images/2.png) | ![](https://raw.githubusercontent.com/wbzhou1992/remoteControl/refs/heads/main/images/3.png) |
