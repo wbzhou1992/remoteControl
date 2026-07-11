@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>远程桌面 - 主机</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .card {
+      background: #1e293b;
+      border-radius: 16px;
+      padding: 32px;
+      max-width: 480px;
+      width: 100%;
+      box-shadow: 0 25px 50px rgba(0,0,0,.4);
+    }
+    h1 { font-size: 1.5rem; margin-bottom: 8px; }
+    .subtitle { color: #94a3b8; margin-bottom: 24px; font-size: 0.9rem; }
+    label { display: block; font-size: 0.85rem; color: #94a3b8; margin-bottom: 6px; }
+    input {
+      width: 100%;
+      padding: 10px 14px;
+      border-radius: 8px;
+      border: 1px solid #334155;
+      background: #0f172a;
+      color: #e2e8f0;
+      margin-bottom: 16px;
+      font-size: 0.95rem;
+    }
+    button {
+      width: 100%;
+      padding: 12px;
+      border: none;
+      border-radius: 8px;
+      background: #3b82f6;
+      color: white;
+      font-size: 1rem;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    button:hover { background: #2563eb; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .room-box {
+      margin-top: 24px;
+      padding: 20px;
+      background: #0f172a;
+      border-radius: 12px;
+      text-align: center;
+      display: none;
+    }
+    .room-id {
+      font-size: 2rem;
+      font-family: monospace;
+      letter-spacing: 4px;
+      color: #60a5fa;
+      margin: 12px 0;
+    }
+    .status {
+      margin-top: 16px;
+      padding: 10px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      background: #0f172a;
+      color: #94a3b8;
+      line-height: 1.5;
+    }
+    .status.connected { color: #4ade80; }
+    .status.error { color: #f87171; }
+    .hint {
+      margin-top: 12px;
+      font-size: 0.8rem;
+      color: #64748b;
+      line-height: 1.5;
+    }
+    video { display: none; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>🖥️ 远程桌面主机</h1>
+    <p class="subtitle">共享屏幕，供 Flutter 控制端连接</p>
+
+    <label>信令服务器</label>
+    <input id="serverUrl" value="" placeholder="ws://localhost:3000/ws" />
+
+    <button id="startBtn" onclick="startHost()">开始共享屏幕</button>
+
+    <div class="room-box" id="roomBox">
+      <div>房间号（发给控制端）</div>
+      <div class="room-id" id="roomId"></div>
+      <button onclick="copyRoomId()">复制房间号</button>
+    </div>
+
+    <div class="status" id="status">未连接</div>
+    <p class="hint">请使用 Chrome / Edge / Firefox，通过 <strong>http://localhost:3000/host.html</strong> 访问（不支持 file:// 打开）</p>
+    <video id="localVideo" autoplay muted playsinline></video>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(location.search);
+    const defaultWs = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`;
+    document.getElementById('serverUrl').value = params.get('server') || defaultWs;
+
+    let ws, pc, localStream, roomId, clientId;
+    const pendingCandidates = [];
+    const pendingViewers = [];
+
+    function setStatus(text, cls = '') {
+      const el = document.getElementById('status');
+      el.textContent = text;
+      el.className = 'status ' + cls;
+    }
+
+    function send(msg) {
+      if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
+    }
+
+    function resetStartButton() {
+      document.getElementById('startBtn').disabled = false;
+    }
+
+    function canUseDisplayMedia() {
+      if (!window.isSecureContext && !['localhost', '127.0.0.1'].includes(location.hostname)) {
+        return { ok: false, reason: '屏幕共享需要 HTTPS 或 localhost 环境' };
+      }
+      if (!navigator.mediaDevices?.getDisplayMedia) {
+        return { ok: false, reason: '当前浏览器不支持 getDisplayMedia，请换用 Chrome / Edge / Firefox' };
+      }
+      return { ok: true };
+    }
+
+    async function startScreenShare() {
+      const check = canUseDisplayMedia();
+      if (!check.ok) throw new Error(check.reason);
+
+      setStatus('请在弹窗中选择要共享的屏幕或窗口...');
+      const stream = await navigator.mediaDevices.getDisplayMedia({
+        video: { frameRate: 30 },
+        audio: false,
+      });
+
+      if (!stream || stream.getVideoTracks().length === 0) {
+        stream?.getTracks().forEach((t) => t.stop());
+        throw new Error('未获取到视频轨道，请重新选择屏幕');
+      }
+
+      stream.getVideoTracks()[0].onended = () => {
+        setStatus('屏幕共享已停止', 'error');
+        resetStartButton();
+      };
+
+      localStream = stream;
+      document.getElementById('localVideo').srcObject = localStream;
+      return localStream;
+    }
+
+    async function connectSignaling() {
+      const serverUrl = document.getElementById('serverUrl').value.trim();
+      ws = new WebSocket(serverUrl);
+
+      await new Promise((resolve, reject) => {
+        ws.onopen = () => resolve();
+        ws.onerror = () => reject(new Error('无法连接信令服务器'));
+        ws.onclose = () => {
+          setStatus('连接已断开', 'error');
+          resetStartButton();
+        };
+      });
+
+      ws.onmessage = async (e) => {
+        let msg;
+        try {
+          msg = JSON.parse(e.data);
+        } catch {
+          return;
+        }
+
+        try {
+          await handleSignalingMessage(msg);
+        } catch (err) {
+          console.error(err);
+          setStatus(err.message || '信令处理失败', 'error');
+        }
+      };
+
+      setStatus('已连接信令服务器，正在创建房间...');
+      send({ type: 'create-room' });
+    }
+
+    async function handleSignalingMessage(msg) {
+      switch (msg.type) {
+        case 'room-created':
+          roomId = msg.roomId;
+          clientId = msg.clientId;
+          document.getElementById('roomId').textContent = roomId;
+          document.getElementById('roomBox').style.display = 'block';
+          setStatus('等待控制端连接...', 'connected');
+          await flushPendingViewers();
+          break;
+
+        case 'viewer-joined':
+          setStatus('控制端已连接，正在建立 WebRTC...');
+          await handleViewerJoined(msg.clientId);
+          break;
+
+        case 'answer':
+          if (!pc) return;
+          await pc.setRemoteDescription(msg.payload);
+          for (const c of pendingCandidates) await pc.addIceCandidate(c);
+          pendingCandidates.length = 0;
+          setStatus('推流中', 'connected');
+          break;
+
+        case 'ice-candidate':
+          if (pc?.remoteDescription) await pc.addIceCandidate(msg.payload);
+          else pendingCandidates.push(msg.payload);
+          break;
+
+        case 'input-event':
+          handleInput(msg.payload);
+          break;
+
+        case 'error':
+          setStatus(msg.message, 'error');
+          break;
+      }
+    }
+
+    async function handleViewerJoined(viewerId) {
+      if (!localStream) {
+        pendingViewers.push(viewerId);
+        return;
+      }
+      await createOffer(viewerId);
+    }
+
+    async function flushPendingViewers() {
+      while (pendingViewers.length > 0) {
+        const viewerId = pendingViewers.shift();
+        await createOffer(viewerId);
+      }
+    }
+
+    async function createOffer(viewerId) {
+      if (!localStream) {
+        throw new Error('屏幕共享未就绪，无法建立连接');
+      }
+
+      if (pc) {
+        pc.close();
+        pc = null;
+      }
+
+      pc = new RTCPeerConnection({
+        iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
+      });
+
+      localStream.getTracks().forEach((track) => pc.addTrack(track, localStream));
+
+      pc.onicecandidate = (e) => {
+        if (e.candidate) {
+          send({ type: 'ice-candidate', targetId: viewerId, payload: e.candidate });
+        }
+      };
+
+      pc.onconnectionstatechange = () => {
+        if (pc.connectionState === 'failed') {
+          setStatus('WebRTC 连接失败，请检查网络或刷新重试', 'error');
+        }
+      };
+
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      send({ type: 'offer', targetId: viewerId, payload: offer });
+    }
+
+    async function startHost() {
+      const startBtn = document.getElementById('startBtn');
+      startBtn.disabled = true;
+
+      try {
+        await startScreenShare();
+        await connectSignaling();
+      } catch (err) {
+        console.error(err);
+        let message = err.message || '启动失败';
+
+        if (err.name === 'NotAllowedError') {
+          message = '你取消了屏幕共享，请重试';
+        } else if (err.name === 'NotSupportedError') {
+          message = '当前环境不支持屏幕共享，请用 Chrome/Edge 打开 http://localhost:3000/host.html';
+        } else if (err.name === 'NotFoundError') {
+          message = '未找到可共享的屏幕';
+        }
+
+        setStatus(message, 'error');
+        localStream?.getTracks().forEach((t) => t.stop());
+        localStream = null;
+        ws?.close();
+        resetStartButton();
+      }
+    }
+
+    function handleInput(event) {
+      // 浏览器受安全限制，无法注入系统级鼠标/键盘，请使用 Flutter 桌面端作为主机。
+      console.log('Input received (browser host is view-only):', event);
+      setStatus('收到控制指令（浏览器主机仅支持观看，请换用 Flutter 主机）', 'error');
+    }
+
+    function copyRoomId() {
+      if (!roomId) return;
+      navigator.clipboard.writeText(roomId);
+      setStatus('房间号已复制', 'connected');
+    }
+  </script>
+</body>
+</html>
