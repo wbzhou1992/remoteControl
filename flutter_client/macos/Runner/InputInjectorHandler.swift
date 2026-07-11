@@ -57,12 +57,42 @@ final class InputInjectorHandler: NSObject, FlutterPlugin {
         result(["width": 1920.0, "height": 1080.0])
       }
 
+    case "decodeThumbnail":
+      if let data = Self.thumbnailData(from: call.arguments) {
+        result(Self.decodeThumbnailToPng(data))
+      } else {
+        result(FlutterError(code: "INVALID_ARGS", message: "Expected thumbnail bytes", details: nil))
+      }
+
     default:
       result(FlutterMethodNotImplemented)
     }
   }
 
   /// CGEvent uses Quartz coordinates (origin top-left). NSScreen.frame uses Cocoa (origin bottom-left).
+  private static func thumbnailData(from arguments: Any?) -> Data? {
+    if let typed = arguments as? FlutterStandardTypedData {
+      return typed.data
+    }
+    if let list = arguments as? [UInt8] {
+      return Data(list)
+    }
+    if let list = arguments as? [NSNumber] {
+      return Data(list.map { $0.uint8Value })
+    }
+    return nil
+  }
+
+  private static func decodeThumbnailToPng(_ data: Data) -> FlutterStandardTypedData? {
+    guard let image = NSImage(data: data),
+          let tiff = image.tiffRepresentation,
+          let bitmap = NSBitmapImageRep(data: tiff),
+          let png = bitmap.representation(using: .png, properties: [:]) else {
+      return nil
+    }
+    return FlutterStandardTypedData(bytes: png)
+  }
+
   private static func quartzFrame(for screen: NSScreen?) -> CGRect? {
     guard let screen else { return nil }
     let cocoa = screen.frame
