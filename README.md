@@ -141,8 +141,8 @@ cd server && npm run dev
 cd flutter_client && flutter analyze
 ```
 
-|                                            主页面                                            |
-| :------------------------------------------------------------------------------------------: |
+|主页面|
+|:------------------------------------------------------------------------------------------: |
 | ![](https://raw.githubusercontent.com/wbzhou1992/remoteControl/refs/heads/main/images/5.png) |
 
 |                                           主机模式                                           |
@@ -154,5 +154,9 @@ cd flutter_client && flutter analyze
 | ![](https://raw.githubusercontent.com/wbzhou1992/remoteControl/refs/heads/main/images/4.png) |
 
 |                                           远程桌面                                           |
-| :------------------------------------------------------------------------------------------: | :------------------------------------------------------------------------------------------: |
-| ![](https://raw.githubusercontent.com/wbzhou1992/remoteControl/refs/heads/main/images/2.png) | ![](https://raw.githubusercontent.com/wbzhou1992/remoteControl/refs/heads/main/images/3.png) |
+| :------------------------------------------------------------------------------------------: |
+| ![](https://raw.githubusercontent.com/wbzhou1992/remoteControl/refs/heads/main/images/2.png) |
+
+|                                           远程桌面                                           |
+| :------------------------------------------------------------------------------------------: |
+| ![](https://raw.githubusercontent.com/wbzhou1992/remoteControl/refs/heads/main/images/3.png) |
